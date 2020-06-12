@@ -16,7 +16,7 @@ const addUser = ({ id, username, room }) => {
 
   //Check for existing user
   const existingUser = users.find((user) => {
-    return user.username === username && user.username === username;
+    return user.username === username && user.room === room;
   });
 
   //Validate username
@@ -29,7 +29,7 @@ const addUser = ({ id, username, room }) => {
   //Store user
   const user = { id, username, room };
   users.push(user);
-  return { user };
+  return user;
 };
 
 const removeUser = (id) => {
@@ -40,9 +40,10 @@ const removeUser = (id) => {
       error: "User not found",
     };
   }
+  const user = users[index];
   if (index > -1) {
     users.splice(index, 1);
-    return users;
+    return user;
   }
 };
 
@@ -58,8 +59,8 @@ const getUser = (id) => {
   return user;
 };
 
-const usersInRoom = (room) => {
-  room = room.trim().toLowerCase();
+const getUsersInRoom = (room) => {
+  // room = room.trim().toLowerCase();
   const array = users.filter((user) => user.room === room);
   return array;
 };
@@ -68,5 +69,5 @@ module.exports = {
   addUser,
   removeUser,
   getUser,
-  usersInRoom,
+  getUsersInRoom,
 };

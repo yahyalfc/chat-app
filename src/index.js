@@ -1,5 +1,10 @@
-const { addUser, removeUser, getUser, usersInRoom } = require("./utils/users");
-
+const {
+  addUser,
+  removeUser,
+  getUser,
+  getUsersInRoom,
+} = require("./utils/users");
+const { capitalizeFirst } = require("./utils/functions");
 const path = require("path");
 const http = require("http");
 
@@ -17,18 +22,34 @@ app.use(express.static(publicDirectoryPath));
 io.on("connection", (socket) => {
   console.log("New Websocket connection");
 
-  socket.on("join", ({ username, room }) => {
-    socket.join(room); // join a room
-    //Welcome user tn room
+  socket.on("join", ({ username, room }, callback) => {
+    console.log(socket.id);
+    const { error, user } = addUser({ id: socket.id, username, room });
 
-    const user = username.charAt(0).toUpperCase() + username.slice(1);
-    const message = `Welcome ${user}`;
+    const userx = getUser(socket.id);
+
+    if (error) {
+      return callback(error);
+    }
+
+    socket.join(userx.room); // join a room
+    //Welcome user to room
+    const usernameC = capitalizeFirst(userx.username);
+
+    const message = `Welcome ${usernameC}`;
     socket.emit("welcomeMessageUI", message); //to welcomeMessage which displays on UI
     socket.emit("messageOnConsole", message); //to messageOn
 
     socket.broadcast
-      .to(room)
-      .emit("messageOnConsole", `${user} has joined us.`);
+      .to(userx.room)
+      .emit("messageOnConsole", `${usernameC} has joined us.`)
+      .to(userx.room)
+      .emit("welcomeMessageUI", `${usernameC} has joined us.`);
+
+    io.to(userx.room).emit("roomData", {
+      room: userx.room,
+      users: getUsersInRoom(userx.room),
+    });
 
     socket.on("sendMessage", (message, callback) => {
       const filter = new Filter();
@@ -36,10 +57,10 @@ io.on("connection", (socket) => {
       if (filter.isProfane(message)) {
         return callback("Profanity is not allowed!");
       }
-      io.to(room).emit("message", {
+      io.to(userx.room).emit("message", {
         message: message,
         createdAt: new Date().getTime(),
-        username: user,
+        username: usernameC,
       });
 
       callback(); //for acknowledgement
@@ -47,8 +68,8 @@ io.on("connection", (socket) => {
 
     socket.on("sendLocation", (object, callback) => {
       const message = `https://maps.google.com?q=${object.lattitude},${object.longitude}`;
-      io.to(room).emit("locationMessage", {
-        username: user,
+      io.to(userx.room).emit("locationMessage", {
+        username: usernameC,
         message: message,
         createdAt: new Date().getTime(),
       });
@@ -58,7 +79,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    io.emit("messageOnConsole", "A user has left");
+    const user = removeUser(socket.id);
+
+    if (user) {
+      const name = user.username;
+
+      io.to(user.room).emit("messageOnConsole", `${name} has left`);
+      io.to(user.room).emit("welcomeMessageUI", `${name} has left`);
+
+      io.to(user.room).emit("roomData", {
+        room: user.room,
+        users: getUsersInRoom(user.room),
+      });
+    }
   });
 });
 

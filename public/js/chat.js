@@ -1,23 +1,59 @@
 const socket = io();
+
 //Elements - as convention we add $ sign
 const $messageForm = document.querySelector("#messageForm");
 const $messageFormInput = $messageForm.querySelector("input"); //capture input field
 const $messageFormButton = document.querySelector("button"); //capture button
 const $messages = document.querySelector("#messages");
 const $locationButton = document.getElementById("locationButton");
+const $sidebar = document.querySelector("#sidebar");
 
 //Templates
 const $messageTemplate = document.querySelector("#messageTemplate").innerHTML;
 const $locationTemplate = document.querySelector("#locationTemplate").innerHTML;
 const $welcomeTemplate = document.querySelector("#welcomeTemplate").innerHTML;
+const $sidebarTemplate = document.querySelector("#sidebar-template").innerHTML;
 
 //Options - we get Qs because of the library we added in chat.html
 const { username, room } = Qs.parse(location.search, {
   ignoreQueryPrefix: true,
 });
 
+const autoscroll = () => {
+  //new message element
+  const $newMessage = $messages.lastElementChild;
+
+  //height of new message
+  const newMessageStyles = getComputedStyle($newMessage);
+  const newMessageMargin = parseInt(newMessageStyles.marginBottom);
+  const newMessageHeight = $newMessage.offsetHeight + newMessageMargin;
+
+  //visible height
+  const visibleHeight = $messages.offsetHeight;
+
+  //height of messages container
+  const containerHeight = $messages.scrollHeight;
+
+  //how far i scrolled
+  const scrollOffsett = $messages.scrollTop + visibleHeight;
+
+  if (containerHeight - newMessageHeight <= scrollOffsett) {
+    $messages.scrollTop = $messages.scrollHeight;
+  }
+};
+
 socket.emit("join", { username, room }, (error) => {
-  console.log(error);
+  if (error) {
+    alert(error);
+    location.href = "/"; //if error redirect to main page
+  }
+});
+
+socket.on("welcomeMessageUI", (message) => {
+  const html = Mustache.render($welcomeTemplate, {
+    message,
+  });
+  $messages.insertAdjacentHTML("beforeend", html);
 });
 
 socket.on("message", (messageObject) => {
@@ -30,13 +66,7 @@ socket.on("message", (messageObject) => {
     username: messageObject.username,
   });
   $messages.insertAdjacentHTML("beforeend", html);
-});
-
-socket.on("welcomeMessageUI", (message) => {
-  const html = Mustache.render($welcomeTemplate, {
-    message,
-  });
-  $messages.insertAdjacentHTML("beforeend", html);
+  autoscroll();
 });
 
 socket.on("locationMessage", (messageObject) => {
@@ -46,10 +76,19 @@ socket.on("locationMessage", (messageObject) => {
     createdAt: moment(messageObject.createdAt).format("hh:mm a"),
   });
   $messages.insertAdjacentHTML("beforeend", html);
+  //autoscroll();
 });
 
 socket.on("messageOnConsole", (message) => {
   console.log(message);
+});
+
+socket.on("roomData", ({ room, users }) => {
+  const html = Mustache.render($sidebarTemplate, {
+    room,
+    users,
+  });
+  $sidebar.innerHTML = html;
 });
 
 // THIS BLOCK OF CODE IS FOR TEXT MESSAGES PART
